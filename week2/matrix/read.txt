@@ -1,0 +1,5 @@
+
+
+Compile matrix vector multiplication program with
+
+mpicc -O2 main_parallel_matrix_vector.c parallel_matrix_vector.c  read_matrix.c  print_matrix.c  print_vector.c  read_vector.c -o test.x
