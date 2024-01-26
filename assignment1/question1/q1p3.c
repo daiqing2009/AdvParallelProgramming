@@ -16,16 +16,18 @@ extern char *optarg;
 extern int opterr, optind;
 
 #define N   300000 /*number counter to check time after N iterations*/
-#define SEC 30 /* the nnumber of seconds processes should keep running */
+#define SEC 5 /* the nnumber of seconds processes should keep running */
+#define DIFF 0.1 /* define the */
 #define SCALE 512 /* the scale of random parameters */
 /* define and prompt the the parameter of program */
-#define OPTSTR "vi:s:h"
-#define USAGE_FMT  "%s [-v] [-s second to keep  process running] [-h]"
-#define DEFAULT_PROGNAME "q1p2"
+#define OPTSTR "vi:s:d:h"
+#define USAGE_FMT  "%s [-v] [-s seconds for differenc check interval] [-d difference ] [-h]"
+#define DEFAULT_PROGNAME "q1p3"
 
 typedef struct {
     int verbose;
     int sec;
+    float diff;
 } options_t;
 
 void usage(char *progname, int opt);
@@ -41,13 +43,15 @@ int main(int argc, char** argv)
 
     int opt;
     /* initial value of program parameter*/
-    options_t options = {0, SEC};
+    options_t options = {0, SEC, DIFF};
     opterr = 0;
 
     while ((opt = getopt(argc, argv, OPTSTR)) != EOF) 
         switch(opt) {
             case 's':
-                options.sec = atoi(optarg);
+                options.sec = (int)atoi(optarg);
+            case 'd':
+                options.diff = (float)atof(optarg);
                 break;
             case 'v':
                 options.verbose += 1;
@@ -60,12 +64,12 @@ int main(int argc, char** argv)
         }    
 
 
-    double time1, time2, time_diff= 0.0; /*timer for each program*/
+    double time1, time2, time2_last, time_diff= 0.0; /*timer for each program*/
     int count =0;
 
     int n =0; /* the trail of finding local_min of each process */
     float x, y = 0.0; /* the value of init */
-    float result, local_min, global_min = 1024.0; /* the init of minimums of eggholder function, maxium of possible function */
+    float result, local_min, global_min, last_global_min, global_min_diff = 1024.0; /* the init of minimums of eggholder function, maxium of possible function */
 
     /* Start up MPI */
     MPI_Init(&argc, &argv);
@@ -78,37 +82,49 @@ int main(int argc, char** argv)
     srand(my_rank);
 
     /* calculate the local minimum of each process */
-    time1=MPI_Wtime();
+    time2_last=time1=MPI_Wtime();
     //printf("time send %lf",time1);
-    do{
+    /* alwasy loop until non-significant improvement has been found*/
+    while(1){
         /* initialize the random value of x and y */
         x = ((float)rand()/(float)(RAND_MAX)) * SCALE;
         y = ((float)rand()/(float)(RAND_MAX)) * SCALE;
 
         result = Eggholder(x,y);
+        /* update local min if found smaller result*/
         if(result<local_min){
             local_min = result;
         }
+        /* only check time after count tickes */
         count++;
         if(count>N){
             time2=MPI_Wtime();
-            time_diff = time2 -time1;
+            time_diff = time2 - time2_last;
             //printf("time difference =  %lf\n",time_diff);
             count = 0;
+            /* observation time span is reach, check result difference*/
+            if(time_diff > options.sec){
+                time2_last = time2;/* reset tick*/
+                /* find global_min of local_min calculated by each process */
+                MPI_Allreduce(&local_min, &global_min, 1, MPI_FLOAT, MPI_MIN, MPI_COMM_WORLD);
+                global_min_diff = last_global_min - global_min;
+                last_global_min = global_min;
+                /*once */
+                if(global_min_diff<options.diff){
+                    printf("local minimum found by process(%d) at the end is %f within(%.3f seconds)\n", my_rank, local_min, time2-time1 );
+                    break;
+                }
+            }
         }
-    }while(time_diff<options.sec);
+    }
 
-    printf("the local minimun found within %fsecs of process(%d) is %f\n",time_diff, my_rank, local_min );
-
-    /* find global_min of local_min calculated by each process */
-    MPI_Reduce(&local_min, &global_min, 1, MPI_FLOAT,
-            MPI_MIN, 0, MPI_COMM_WORLD);
-    
-    MPI_Barrier(MPI_COMM_WORLD);/* make sure global result print last*/
+    MPI_Barrier(MPI_COMM_WORLD);
     if(my_rank == 0)
     {
+        /* compare diff between steps, if no significant, stop try*/
         printf("the global minimum found of eggholder function is %f with x =  %f and y = %f\n",
                 global_min, x, y);
+        printf("different found between checks is %f", global_min_diff);
     }
     /* Shut down MPI */
     MPI_Finalize();
@@ -116,7 +132,7 @@ int main(int argc, char** argv)
 }
 
 void usage(char *progname, int opt) {
-   fprintf(stderr, USAGE_FMT, progname?progname:DEFAULT_PROGNAME);
-   exit(EXIT_FAILURE);
-   /* NOTREACHED */
+    fprintf(stderr, USAGE_FMT, progname?progname:DEFAULT_PROGNAME);
+    exit(EXIT_FAILURE);
+    /* NOTREACHED */
 }

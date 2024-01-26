@@ -91,7 +91,8 @@ int main(int argc, char** argv)
     /* find global_min of local_min calculated by each process */
     MPI_Reduce(&local_min, &global_min, 1, MPI_FLOAT,
             MPI_MIN, 0, MPI_COMM_WORLD);
-
+    
+    MPI_Barrier(MPI_COMM_WORLD);/* make sure global result print last*/
     if(my_rank == 0)
     {
         printf("the global minimum found of eggholder function is %f with x =  %f and y = %f\n",
