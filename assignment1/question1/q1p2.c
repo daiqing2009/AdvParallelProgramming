@@ -7,23 +7,25 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <libgen.h>
-#include <errno.h>
 #include <string.h>
 #include <getopt.h>
 #include "mpi.h"
 
 extern float Eggholder(float x, float y);
+extern char *optarg;
+extern int opterr, optind;
 
-#define N 1000 /* the number of iteration each process should try */
+#define N   100000 /*number counter to check time after N iterations*/
+#define SEC 30 /* the nnumber of seconds processes should keep running */
 #define SCALE 512 /* the scale of random parameters */
 /* define and prompt the the parameter of program */
-#define OPTSTR "vi:n:h"
-#define USAGE_FMT  "%s [-v] [-n total Iteraion Per process] [-h]"
+#define OPTSTR "vi:s:h"
+#define USAGE_FMT  "%s [-v] [-s second to keep  process running] [-h]"
 #define DEFAULT_PROGNAME "q1p2"
 
 typedef struct {
     int verbose;
-    int secToRun;
+    int sec;
 } options_t;
 
 void usage(char *progname, int opt);
@@ -39,13 +41,13 @@ int main(int argc, char** argv)
 
     int opt;
     /* initial value of program parameter*/
-    options_t options = {0, N};
+    options_t options = {0, SEC};
     opterr = 0;
 
     while ((opt = getopt(argc, argv, OPTSTR)) != EOF) 
         switch(opt) {
-            case 'n':
-                options.totalIter = atoi(optarg);
+            case 's':
+                options.sec = atoi(optarg);
                 break;
             case 'v':
                 options.verbose += 1;
@@ -57,6 +59,9 @@ int main(int argc, char** argv)
                 break;
         }    
 
+
+    double time1, time2, time_diff= 0.0; /*timer for each program*/
+    int count =0;
 
     int n =0; /* the trail of finding local_min of each process */
     float x, y = 0.0; /* the value of init */
@@ -73,8 +78,9 @@ int main(int argc, char** argv)
     srand(my_rank);
 
     /* calculate the local minimum of each process */
-    int i=0;
-    for(; i <options.totalIter; i++ ){
+    time1=MPI_Wtime();
+    //printf("time send %lf",time1);
+    do{
         /* initialize the random value of x and y */
         x = ((float)rand()/(float)(RAND_MAX)) * SCALE;
         y = ((float)rand()/(float)(RAND_MAX)) * SCALE;
@@ -83,9 +89,16 @@ int main(int argc, char** argv)
         if(result<local_min){
             local_min = result;
         }
-    }
+        count++;
+        if(count>N){
+            time2=MPI_Wtime();
+            time_diff = time2 -time1;
+            //printf("time difference =  %lf\n",time_diff);
+            count = 0;
+        }
+    }while(time_diff<options.sec);
 
-    printf("the local minimun found of process(%d) is %f\n",my_rank, local_min );
+    printf("the local minimun found within %fsecs of process(%d) is %f\n",time_diff, my_rank, local_min );
 
     /* find global_min of local_min calculated by each process */
     MPI_Reduce(&local_min, &global_min, 1, MPI_FLOAT,
