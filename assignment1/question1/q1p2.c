@@ -7,24 +7,23 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <errno.h>
 #include <string.h>
 #include <getopt.h>
 #include "mpi.h"
 
 extern float Eggholder(float x, float y);
-extern char *optarg;
-extern int opterr, optind;
 
 #define N 1000 /* the number of iteration each process should try */
 #define SCALE 512 /* the scale of random parameters */
 /* define and prompt the the parameter of program */
 #define OPTSTR "vi:n:h"
-#define USAGE_FMT  "%s [-v] [-n total Iteraion Per process] [-h]\n"
-#define DEFAULT_PROGNAME "q1p1"
+#define USAGE_FMT  "%s [-v] [-n total Iteraion Per process] [-h]"
+#define DEFAULT_PROGNAME "q1p2"
 
 typedef struct {
     int verbose;
-    int totalIter;
+    int secToRun;
 } options_t;
 
 void usage(char *progname, int opt);
@@ -42,11 +41,11 @@ int main(int argc, char** argv)
     /* initial value of program parameter*/
     options_t options = {0, N};
     opterr = 0;
+
     while ((opt = getopt(argc, argv, OPTSTR)) != EOF) 
         switch(opt) {
             case 'n':
-                //printf("optarg: %s\n",optarg);
-                options.totalIter = (int)strtoul(optarg, NULL, 10);
+                options.totalIter = atoi(optarg);
                 break;
             case 'v':
                 options.verbose += 1;
