@@ -1,6 +1,7 @@
 /* main_parallel_matrix_vector.c */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>//to include memcpy
 #include "mpi.h"
 
 #define MATRIX_FILE_NAME    "matrix.data"
@@ -116,11 +117,17 @@ void Gather_save_matrix(float local_A[], int m, int n,
     MPI_Type_commit(&column_mpi_t);
 
     if (my_rank==0){
-        int i,j,index_rec;
+        int i,j;        //index of block for copy
+        int index_rec;  //index of starting index of block copy
+        int i0,j0;      //index of process 0 copy
         for(i=0;i<p;i++){
-
-            //TODO: add the content of process 0 into global_row
-            
+            // copy the content of process 0 into global_row
+            for(i0=0;i0<local_m;i0++){
+                for(j0=0;j0<local_n;j0++){
+                    global_row[i0*n+j0] = local_A[i*local_m*local_n+i0*local_n+j0];
+                }   
+            }
+            Print_matrix("global row after proc(0) copy", &(global_row[0]), local_m, n);
             for(j=1;j<p;j++){
                 index_rec=j*local_n;
                 MPI_Recv(&(global_row[index_rec]),1,column_mpi_t,j,i,MPI_COMM_WORLD,&status);
@@ -176,7 +183,7 @@ void Read_scatter_matrix(float local_A[],
         while(fgets(global_row,sizeof(global_row),stdin)!=NULL){
             for(j=1;j<p;j++){
                 index_send=j*local_n;
-                snprintf(prompt, 100, "Before send matrix to process(%d) batch(%d)",j,i);
+                snprintf(prompt, 100, "Read and sendng matrix to process(%d) batch(%d)",j,i);
                 Print_matrix(prompt,&(global_row[0]),local_m,n);
 
                 MPI_Send(&(global_row[index_send]),1,column_mpi_t,j,i,MPI_COMM_WORLD);          
