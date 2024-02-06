@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
 
     return 0;
 }  
-
+//TODO: add stride to print function to reaview the real portion sent/recieved
 void Print_matrix(char *prompt,float *mat, int m, int n){
     int i, j;
     printf("%s\n", prompt);
@@ -109,11 +109,7 @@ void Gather_save_matrix(float local_A[], int m, int n,
 
     int local_m = m/p;
     int local_n = n/p;
-    /*
-       MPI_Gather(local_A, local_m*n, MPI_FLOAT, 
-       temp_matrix, local_m*n, MPI_FLOAT, 
-       0, MPI_COMM_WORLD);
-       */
+
     MPI_Status status;
     MPI_Datatype column_mpi_t;
     MPI_Type_vector(local_m*local_n,local_n,n,MPI_FLOAT, &column_mpi_t);
@@ -122,15 +118,17 @@ void Gather_save_matrix(float local_A[], int m, int n,
     if (my_rank==0){
         int i,j,index_rec;
         for(i=0;i<p;i++){
+
+            //TODO: add the content of process 0 into global_row
+            
             for(j=1;j<p;j++){
                 index_rec=j*local_n;
                 MPI_Recv(&(global_row[index_rec]),1,column_mpi_t,j,i,MPI_COMM_WORLD,&status);
 
-                snprintf(prompt, 100, "Recieved matrix from process(%d) batch(%d)",j,i);
-                Print_matrix(prompt,&(global_row[index_rec]),local_m,local_n);
+                snprintf(prompt, 100, "After Recieved matrix from process(%d) batch(%d)",j,i);
+                Print_matrix(prompt,&(global_row[0]),local_m,n);
 
             }
-            //TODO: add the content of process 0 into global_row
             // write to file once global_row is filled
             fwrite(global_row,sizeof(float),sizeof(global_row),fp);
             //break; 
@@ -162,46 +160,41 @@ void Read_scatter_matrix(float local_A[],
         exit(EXIT_FAILURE);
     }
 
-
     char prompt [100];
 
     int local_m = m/p;
     int local_n = n/p;
-    /*
-       MPI_Gather(local_A, local_m*n, MPI_FLOAT, 
-       temp_matrix, local_m*n, MPI_FLOAT, 
-       0, MPI_COMM_WORLD);
-       */
+
     MPI_Status status;
     MPI_Datatype column_mpi_t;
     MPI_Type_vector(local_m*local_n,local_n,n,MPI_FLOAT, &column_mpi_t);
     MPI_Type_commit(&column_mpi_t);
 
     if (my_rank==0){
-        int i,j,index_rec;
+        int i,j,index_send;
         i = 0;
         while(fgets(global_row,sizeof(global_row),stdin)!=NULL){
-            //for(i=1;i<p;i++){
-                for(j=1;j<p;j++){
-                    index_rec=j*local_n;
-                    snprintf(prompt, 100, "Send matrix to process(%d) batch(%d)",j,i);
-                    Print_matrix(prompt,&(global_row[index_rec]),local_m,local_n);
+            for(j=1;j<p;j++){
+                index_send=j*local_n;
+                snprintf(prompt, 100, "Before send matrix to process(%d) batch(%d)",j,i);
+                Print_matrix(prompt,&(global_row[0]),local_m,n);
 
-                    MPI_Send(&(global_row[index_rec]),1,column_mpi_t,j,i,MPI_COMM_WORLD);          
-                }
-                i++;
-
-            //}
+                MPI_Send(&(global_row[index_send]),1,column_mpi_t,j,i,MPI_COMM_WORLD);          
+            }
+            i++;
         }
 
     }
     else{
-        int i, index_send;
+        int i, index_rec;
         for(i=0;i<p;i++){
-            MPI_Recv(&(local_A[index_send]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
+            index_rec = i*local_m*local_n;
+            //MPI_Recv(&(local_A[index_rec]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
+            MPI_Recv(&(global_row[index_rec]),1,column_mpi_t,0,i,MPI_COMM_WORLD,&status);
             snprintf(prompt, 100, "Reciving matrix at process(%d) batch(%d)",my_rank, i);
-            index_send = i*local_m*local_n;
-            Print_matrix(prompt,&(local_A[index_send]), local_m, local_n);
+            //Print_matrix(prompt,&(local_A[index_rec]), local_m, local_n);
+            Print_matrix(prompt,&(global_row[0]),local_m,n);
+
         } 
 
     }
