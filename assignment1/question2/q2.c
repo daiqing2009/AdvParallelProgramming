@@ -57,9 +57,9 @@ int main(int argc, char* argv[])
     free(local_A);
     free(global_row);
 
-    return 0;
+    return EXIT_SUCCESS;
 }  
-//TODO: add stride to print function to reaview the real portion sent/recieved
+
 void Print_matrix(char *prompt,float *mat, int m, int n){
     int i, j;
     printf("%s\n", prompt);
@@ -100,7 +100,7 @@ void Gather_save_matrix(float local_A[], int m, int n,
 
     //TODO: remove file in the directory if already exits
 
-    if((fp = fopen(MATRIX_FILE_NAME,"ab+"))==NULL){
+    if((fp = fopen(MATRIX_FILE_NAME,"a+"))==NULL){
         printf("Cant initializd matrix.data");
         exit(EXIT_FAILURE);
     }
@@ -127,7 +127,7 @@ void Gather_save_matrix(float local_A[], int m, int n,
                     global_row[i0*n+j0] = local_A[i*local_m*local_n+i0*local_n+j0];
                 }   
             }
-            Print_matrix("global row after proc(0) copy", &(global_row[0]), local_m, n);
+            // Print_matrix("global row after proc(0) copy", &(global_row[0]), local_m, n);
             for(j=1;j<p;j++){
                 index_rec=j*local_n;
                 MPI_Recv(&(global_row[index_rec]),1,column_mpi_t,j,i,MPI_COMM_WORLD,&status);
@@ -137,8 +137,8 @@ void Gather_save_matrix(float local_A[], int m, int n,
 
             }
             // write to file once global_row is filled
-            fwrite(global_row,sizeof(float),sizeof(global_row),fp);
-            //break; 
+            fwrite(global_row,sizeof(float),local_m*n,fp);
+            printf("finish writing to file by process(0) for batch(%d)\n",i ); 
         }
     }
     else{
@@ -162,7 +162,7 @@ void Gather_save_matrix(float local_A[], int m, int n,
 void Read_scatter_matrix(float local_A[],
         int m, int n, int my_rank, int p, float global_row[]){
     FILE *fp;
-    if((fp = fopen(MATRIX_FILE_NAME,"rb"))==NULL){
+    if((fp = fopen(MATRIX_FILE_NAME,"r"))==NULL){
         printf("Cant read matrix.data");
         exit(EXIT_FAILURE);
     }
@@ -179,8 +179,24 @@ void Read_scatter_matrix(float local_A[],
 
     if (my_rank==0){
         int i,j,index_send;
+        int ig,jg,ret;
         i = 0;
-        while(fgets(global_row,sizeof(global_row),stdin)!=NULL){
+        for(i=0;i<=p;i++){
+            // read from file 
+            for (ig = 0; ig < local_m; ++ig) {
+                for (jg = 0; jg < n - 1; ++jg) {
+                    if(EOF== fscanf(fp, "%f ", &global_row[ig*n+jg])){
+                        printf("EOF reached!\n");
+                        exit(EXIT_SUCCESS);
+                    }
+                }
+                if(EOF == fscanf(fp, "%f", &global_row[ig*n - 1])){
+                    printf("EOF reached!\n");
+                    exit(EXIT_SUCCESS);
+                }
+                
+            }
+        
             for(j=1;j<p;j++){
                 index_send=j*local_n;
                 snprintf(prompt, 100, "Read and sendng matrix to process(%d) batch(%d)",j,i);
@@ -188,18 +204,22 @@ void Read_scatter_matrix(float local_A[],
 
                 MPI_Send(&(global_row[index_send]),1,column_mpi_t,j,i,MPI_COMM_WORLD);          
             }
-            i++;
+            printf("process 0 has finished sending batch(%d)\n",i);
         }
+        //TODO: nice to have ~ copy data to local_A of process 0;
+        printf("process 0 has finished reading the file\n");
 
     }
     else{
         int i, index_rec;
         for(i=0;i<p;i++){
             index_rec = i*local_m*local_n;
+            snprintf(prompt, 100, "Recieved matrix at process(%d) batch(%d)",my_rank, i);
             //MPI_Recv(&(local_A[index_rec]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
-            MPI_Recv(&(global_row[index_rec]),1,column_mpi_t,0,i,MPI_COMM_WORLD,&status);
-            snprintf(prompt, 100, "Reciving matrix at process(%d) batch(%d)",my_rank, i);
             //Print_matrix(prompt,&(local_A[index_rec]), local_m, local_n);
+            MPI_Recv(&(global_row[local_n/2]),1,column_mpi_t,0,i,MPI_COMM_WORLD,&status);
+            //MPI_Recv(&(global_row[local_n/2]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
+ 
             Print_matrix(prompt,&(global_row[0]),local_m,n);
 
         } 
