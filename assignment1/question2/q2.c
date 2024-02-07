@@ -66,20 +66,21 @@ void Print_matrix(char *prompt,float *mat, int m, int n){
     int i, j;
     printf("%s\n", prompt);
     // only print left-most portion of matrix when too large
-    bool print_line=false;
+    bool print_return=false;
     for(int i = 0; i < m; i++) {
-        
+        print_return = false;
         for(int j = 0; j < n; j++) {
             if((i+j)<SHOW_DIG_LEN||(i+j)>n+m-2-SHOW_DIG_LEN){
-                print_line = true;
+                print_return = true;
                 printf("%.2f ", mat[i*n+j]);
             }
             if((i+j)==SHOW_DIG_LEN&&((i+j)<n+m-2-SHOW_DIG_LEN)){
-                print_line = true;
+                if(j==n-1)
+                    print_return = true;
                 printf(" ... ");
             }
         }
-        if(print_line)
+        if(print_return)
             printf("\n");
     } 
 }
