@@ -2,25 +2,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>//to include memcpy
+#include <stdbool.h>
 #include "mpi.h"
 
 #define FILE_NAME_LEN   50
 #define PROMPT_LEN      80
+#define SHOW_DIG_LEN    3
 
-void Init_local_matrix(float local_A[],
-        int m, int n, int my_rank, int p);
+void Init_local_matrix(float *local_A, int m, int n, int my_rank, int p);
 
-void Gather_save_matrix(float local_A[],
-        int m, int n, int my_rank, int p, float global_row[]);
+void Gather_save_matrix(int m, int n, int my_rank, int p);
 
-void Read_scatter_matrix(float local_A[],
-        int m, int n, int my_rank, int p, float global_row[]);
+void Read_scatter_matrix(int m, int n, int my_rank, int pi);
 
 int main(int argc, char* argv[]) 
 {
     int             my_rank, p;
-    float           *local_A; 
-    float           *global_row;
     int             m, n;
 
     MPI_Init(&argc, &argv);
@@ -37,26 +34,34 @@ int main(int argc, char* argv[])
     MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    int local_m = m/p;
-    int local_n = n/p;
-    local_A=(float *)malloc(m*local_n*sizeof(float));
-    global_row=(float *)malloc(local_m*n*sizeof(float));
+    //int local_m = m/p;
+    //int local_n = n/p;
+    double time1, time2, time3;
 
     /* Init local matrix of each process before gather at process 0 */
-    Init_local_matrix(local_A, m, n, my_rank, p);
-    //TODO: add profiling timer
-    Gather_save_matrix(local_A, m, n, my_rank, p,global_row);
-    //TODO: empty lcoal_A and global_row to make sure the content was read from file
-    //TODO: add profiling timer
-    Read_scatter_matrix(local_A, m, n, my_rank, p,global_row);
-    //TODO: add profiling timer
+    //Init_local_matrix(m, n, my_rank, p);
+    //add profiling timer
+    if(0==my_rank){
+        time1 = MPI_Wtime();
+    }
 
-    //TODO: print the performance
+    Gather_save_matrix(m, n, my_rank, p);
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    //add profiling timer
+    if(0==my_rank){
+        time2 = MPI_Wtime();
+    }   
+    Read_scatter_matrix(m, n, my_rank, p);
+    // add profiling timer
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(0==my_rank){
+        time3 = MPI_Wtime();
+        //Performance summary
+        printf("The time elapsed for Gather_save_matrix:%.2f s\n", time2-time1);
+        printf("The time elapsed for Read_scatter_matrix:%.2f s\n", time3-time2);
+    }
     MPI_Finalize();
-
-    free(local_A);
-    free(global_row);
 
     return EXIT_SUCCESS;
 }  
@@ -64,38 +69,53 @@ int main(int argc, char* argv[])
 void Print_matrix(char *prompt,float *mat, int m, int n){
     int i, j;
     printf("%s\n", prompt);
-    //TODO: only print left-most portion of matrix when too large
+    // only print left-most portion of matrix when too large
+    bool print_line=false;
     for(int i = 0; i < m; i++) {
+        
         for(int j = 0; j < n; j++) {
-            printf("%.2f ", mat[i*n+j]);
+            if((i+j)<SHOW_DIG_LEN||(i+j)>n+m-2-SHOW_DIG_LEN){
+                print_line = true;
+                printf("%.2f ", mat[i*n+j]);
+            }
+            if((i+j)==SHOW_DIG_LEN&&((i+j)<n+m-2-SHOW_DIG_LEN)){
+                print_line = true;
+                printf(" ... ");
+            }
         }
-        printf("\n");
+        if(print_line)
+            printf("\n");
     } 
 }
 
-void Init_local_matrix(float local_A[], int m, int n,
-        int my_rank, int p)
+void Init_local_matrix(float *local_A ,int m, int n,int my_rank, int p)
 {
     char prompt [PROMPT_LEN];
     snprintf(prompt,PROMPT_LEN , "Printing the initial matrix of process(%d)",my_rank);
 
     int local_m = m/p;
     int local_n = n/p;
+    //    float           *local_A; 
+    //    float           *global_row;
+    //    local_A=(float *)malloc(m*local_n*sizeof(float));
+    //    global_row=(float *)malloc(local_m*n*sizeof(float));
 
     int i, j;
     for (i = 0; i < m; i++)
         for (j = 0; j < local_n; j++)
             local_A[i*local_n+j] = (float)(i*n+my_rank*local_n+j);
 
-    Print_matrix(prompt, local_A, m, local_n);
+    //Print_matrix(prompt, local_A, m, local_n);
+
+    //    free(local_A);
+    //    free(global_row);
 }
 
 /** Fulfill the requieremnt of section a: 
  * process 0 recieved matrix from other proceses and save in sequence
  * While recieving the matrix, proceess 0 print them immediately
  */
-void Gather_save_matrix(float local_A[], int m, int n, 
-        int my_rank, int p, float global_row[])
+void Gather_save_matrix(int m, int n, int my_rank, int p)
 {
     FILE *fp;
     char file_name[FILE_NAME_LEN];
@@ -103,6 +123,12 @@ void Gather_save_matrix(float local_A[], int m, int n,
     char prompt [PROMPT_LEN];
     int local_m = m/p;
     int local_n = n/p;
+    float           *local_A; 
+    float           *global_row;
+    local_A=(float *)malloc(m*local_n*sizeof(float));
+    global_row=(float *)malloc(local_m*n*sizeof(float));
+
+    Init_local_matrix(local_A,m,n,my_rank,p);
 
     MPI_Status status;
     MPI_Datatype column_mpi_t;
@@ -125,16 +151,17 @@ void Gather_save_matrix(float local_A[], int m, int n,
                 index_rec=j*local_n;
                 MPI_Recv(&(global_row[index_rec]),1,column_mpi_t,j,i,MPI_COMM_WORLD,&status);
 
-                snprintf(prompt, PROMPT_LEN, "After Recieved matrix from process(%d) batch(%d)",j,i);
-                Print_matrix(prompt,&(global_row[0]),local_m,n);
-
-            }
+           }
             snprintf(file_name,FILE_NAME_LEN , "matrix_p%d.data", i);
             if(NULL==(fp = fopen(file_name,"w+"))){
                 printf("Cant initializd matrix.data");
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
+            
+            snprintf(prompt, PROMPT_LEN, "After Recieved matrix from process(%d) batch(%d)",j,i);
+            Print_matrix(prompt,&(global_row[0]),local_m,n);
+
             // write to file once global_row is filled
             fwrite(global_row,sizeof(float),local_m*n,fp);
             fclose(fp);
@@ -146,11 +173,14 @@ void Gather_save_matrix(float local_A[], int m, int n,
         for(i=0;i<p;i++){
             snprintf(prompt, PROMPT_LEN, "Sending  matrix from process(%d) batch(%d)",my_rank,i);
             index_send = i*local_m*local_n;
-            Print_matrix(prompt,&(local_A[index_send]), local_m, local_n);
+            //Print_matrix(prompt,&(local_A[index_send]), local_m, local_n);
             MPI_Send(&(local_A[index_send]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD);
         }
 
     }
+
+    free(local_A);
+    free(global_row);
 
 } 
 
@@ -158,8 +188,7 @@ void Gather_save_matrix(float local_A[], int m, int n,
  * process 0 read row by row of the matrix saved in file
  * and scat ter n/p portion to other processes
  */
-void Read_scatter_matrix(float local_A[],
-        int m, int n, int my_rank, int p, float global_row[]){
+void Read_scatter_matrix(int m, int n, int my_rank, int p){
     FILE *fp;
     char file_name[FILE_NAME_LEN];
 
@@ -167,6 +196,11 @@ void Read_scatter_matrix(float local_A[],
 
     int local_m = m/p;
     int local_n = n/p;
+
+    float           *local_A; 
+    float           *global_row;
+    local_A=(float *)malloc(m*local_n*sizeof(float));
+    global_row=(float *)malloc(local_m*n*sizeof(float));
 
     MPI_Status status;
     MPI_Datatype column_mpi_t;
@@ -188,32 +222,30 @@ void Read_scatter_matrix(float local_A[],
             // read from file 
             for (ig = 0; ig < local_m; ++ig) {
                 for (jg = 0; jg < n - 1; ++jg) {
-                    if(EOF== fscanf(fp, "%f ", &global_row[ig*n+jg])){
+                    if(EOF== fscanf(fp, "%f ", &(global_row[ig*n+jg]))){
                         printf("EOF reached!\n");
                         fclose(fp);
                         exit(EXIT_FAILURE);
                     }
                 }
-                if(EOF == fscanf(fp, "%f", &global_row[ig*n - 1])){
+                if(EOF == fscanf(fp, "%f", &(global_row[ig*n - 1]))){
                     printf("EOF reached!\n");
                     fclose(fp);
                     exit(EXIT_FAILURE);
                 }
             }
-            fclose(fp);
+            snprintf(prompt,PROMPT_LEN , "Read  matrix of batch(%d)",i);
+            Print_matrix(prompt,&(global_row[0]),local_m,n);
 
             for(j=1;j<p;j++){
                 index_send=j*local_n;
-                snprintf(prompt,PROMPT_LEN , "Read and sendng matrix to process(%d) batch(%d)",j,i);
-                Print_matrix(prompt,&(global_row[0]),local_m,n);
-
                 MPI_Send(&(global_row[index_send]),1,column_mpi_t,j,i,MPI_COMM_WORLD);          
             }
             printf("process 0 has finished sending batch(%d)\n",i);
         }
         //TODO: nice to have ~ copy data to local_A of process 0;
         printf("process 0 has finished reading the file\n");
-
+        fclose(fp);
     }
     else{
         int i, index_rec;
@@ -225,10 +257,12 @@ void Read_scatter_matrix(float local_A[],
             MPI_Recv(&(global_row[local_n/2]),1,column_mpi_t,0,i,MPI_COMM_WORLD,&status);
             //MPI_Recv(&(global_row[local_n/2]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
 
-            Print_matrix(prompt,&(global_row[0]),local_m,n);
+            //Print_matrix(prompt,&(global_row[0]),local_m,n);
 
         } 
 
     }
+    free(local_A);
+    free(global_row);
 }
 
