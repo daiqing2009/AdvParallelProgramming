@@ -229,16 +229,16 @@ void Read_scatter_matrix(int m, int n, int my_rank, int p){
         int i, index_rec;
         for(i=0;i<p;i++){
             index_rec = i*local_m*local_n;
-            snprintf(prompt, PROMPT_LEN, "Recieved matrix at process(%d) batch(%d)",my_rank, i);
-            //MPI_Recv(&(local_A[index_rec]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
-            //Print_matrix(prompt,&(local_A[index_rec]), local_m, local_n);
-            MPI_Recv(&(global_row[local_n/2]),1,column_mpi_t,0,i,MPI_COMM_WORLD,&status);
+            MPI_Recv(&(local_A[index_rec]),local_m*n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
+            //MPI_Recv(&(global_row[local_n/2]),1,column_mpi_t,0,i,MPI_COMM_WORLD,&status);
             //MPI_Recv(&(global_row[local_n/2]),local_m*local_n,MPI_FLOAT,0,i,MPI_COMM_WORLD,&status);
 
             //Print_matrix(prompt,&(global_row[0]),local_m,n);
 
-        } 
-
+        }
+        
+        snprintf(prompt, PROMPT_LEN, "Recieved matrix at process(%d) after (%d) batches",my_rank, i);
+        Print_matrix(prompt,&(local_A[0]), m, local_n);
     }
     free(local_A);
     free(global_row);
