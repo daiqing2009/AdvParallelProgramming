@@ -34,12 +34,8 @@ int main(int argc, char* argv[])
     MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    //int local_m = m/p;
-    //int local_n = n/p;
     double time1, time2, time3;
 
-    /* Init local matrix of each process before gather at process 0 */
-    //Init_local_matrix(m, n, my_rank, p);
     //add profiling timer
     if(0==my_rank){
         time1 = MPI_Wtime();
@@ -95,10 +91,6 @@ void Init_local_matrix(float *local_A ,int m, int n,int my_rank, int p)
 
     int local_m = m/p;
     int local_n = n/p;
-    //    float           *local_A; 
-    //    float           *global_row;
-    //    local_A=(float *)malloc(m*local_n*sizeof(float));
-    //    global_row=(float *)malloc(local_m*n*sizeof(float));
 
     int i, j;
     for (i = 0; i < m; i++)
@@ -106,9 +98,6 @@ void Init_local_matrix(float *local_A ,int m, int n,int my_rank, int p)
             local_A[i*local_n+j] = (float)(i*n+my_rank*local_n+j);
 
     //Print_matrix(prompt, local_A, m, local_n);
-
-    //    free(local_A);
-    //    free(global_row);
 }
 
 /** Fulfill the requieremnt of section a: 
@@ -153,7 +142,7 @@ void Gather_save_matrix(int m, int n, int my_rank, int p)
 
            }
             snprintf(file_name,FILE_NAME_LEN , "matrix_p%d.data", i);
-            if(NULL==(fp = fopen(file_name,"w+"))){
+            if(NULL==(fp = fopen(file_name,"wb+"))){
                 printf("Cant initializd matrix.data");
                 fclose(fp);
                 exit(EXIT_FAILURE);
@@ -201,39 +190,28 @@ void Read_scatter_matrix(int m, int n, int my_rank, int p){
     float           *global_row;
     local_A=(float *)malloc(m*local_n*sizeof(float));
     global_row=(float *)malloc(local_m*n*sizeof(float));
+    // Print_matrix("Emptied global_row",&(global_row[0]),local_m,n);
 
     MPI_Status status;
     MPI_Datatype column_mpi_t;
     MPI_Type_vector(local_m*local_n,local_n,n,MPI_FLOAT, &column_mpi_t);
     MPI_Type_commit(&column_mpi_t);
-
+    
     if (my_rank==0){
         int i,j,index_send;
         int ig,jg,ret;
         i = 0;
         for(i=0;i<p;i++){
             snprintf(file_name,FILE_NAME_LEN , "matrix_p%d.data", i);
-            if(NULL== (fp = fopen(file_name,"r"))){
+            if(NULL== (fp = fopen(file_name,"rb"))){
                 printf("Cant read matrix.data");
                 fclose(fp);
                 exit(EXIT_FAILURE);
             }
 
             // read from file 
-            for (ig = 0; ig < local_m; ++ig) {
-                for (jg = 0; jg < n - 1; ++jg) {
-                    if(EOF== fscanf(fp, "%f ", &(global_row[ig*n+jg]))){
-                        printf("EOF reached!\n");
-                        fclose(fp);
-                        exit(EXIT_FAILURE);
-                    }
-                }
-                if(EOF == fscanf(fp, "%f", &(global_row[ig*n - 1]))){
-                    printf("EOF reached!\n");
-                    fclose(fp);
-                    exit(EXIT_FAILURE);
-                }
-            }
+            fread(global_row, sizeof(float), local_m*n, fp);
+
             snprintf(prompt,PROMPT_LEN , "Read  matrix of batch(%d)",i);
             Print_matrix(prompt,&(global_row[0]),local_m,n);
 
