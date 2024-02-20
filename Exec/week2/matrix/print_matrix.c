@@ -7,6 +7,7 @@ void Print_matrix(char *title, LOCAL_MATRIX_T  local_A,
         int local_m, int n, int my_rank, int p)
 {
     int   i, j;
+    //TODO: set matrix to size of m * n
     float temp_matrix[MAX_ORDER][MAX_ORDER];
 
     MPI_Gather(local_A, local_m*MAX_ORDER, MPI_FLOAT, 

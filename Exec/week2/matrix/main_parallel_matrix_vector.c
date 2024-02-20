@@ -21,12 +21,14 @@ int main(int argc, char* argv[])
     {
         printf("Enter the dimensions of the matrix (m x n)\n");
         scanf("%d %d", &m, &n);
+//TODO: make sure m&n are all possitive number
     }
     MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     local_m = m/p;
     local_n = n/p;
+    //TODO: allocate global/lcoal x/local y memory space according to m & n
 
     Read_matrix("Enter the matrix values", 
             local_A, local_m, n, my_rank, p);

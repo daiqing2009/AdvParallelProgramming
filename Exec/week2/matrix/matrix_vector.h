@@ -1,6 +1,7 @@
 /* matrix_vector.h */
 #define MAX_ORDER 100
 
+//TODO: change local matrix into flexible acoomodated ones
 typedef float LOCAL_MATRIX_T[MAX_ORDER][MAX_ORDER];
 
 void Read_matrix(char* prompt, LOCAL_MATRIX_T local_A, 

@@ -1,0 +1,2 @@
+mpicc -O2 reduce_io_trapezoid.c trapezoid_rule.c getdata_broadcast.c func.c
+

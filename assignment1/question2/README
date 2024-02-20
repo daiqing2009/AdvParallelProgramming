@@ -1,0 +1,2 @@
+# compile of q2
+mpicc -std=c99 -O2 q2.c -o q2.o

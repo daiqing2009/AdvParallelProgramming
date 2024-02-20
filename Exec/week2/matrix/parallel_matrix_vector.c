@@ -2,10 +2,9 @@
 #include "mpi.h"
 #include "matrix_vector.h"
 
-    void Parallel_matrix_vector_prod
-( LOCAL_MATRIX_T  local_A, int m, int n,
-  float local_x[], float global_x[], float local_y[],
-  int   local_m, int local_n)
+void Parallel_matrix_vector_prod ( LOCAL_MATRIX_T  local_A, int m, int n,
+        float local_x[], float global_x[], float local_y[],
+        int   local_m, int local_n)
 {
     /* local_m = m/p, local_n = n/p */
     int i, j;

@@ -1,0 +1,6 @@
+# compile of q1p1
+mpicc -O2 Eggholder.c q1p1.c -o q1p1.o -lm
+# compile of q1p2
+mpicc -O2 Eggholder.c q1p2.c -o q1p2.o -lm
+# compile of q1p3
+mpicc -O2 Eggholder.c q1p3.c -o q1p3.o -lm

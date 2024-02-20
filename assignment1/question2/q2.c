@@ -239,7 +239,7 @@ void Read_scatter_matrix(int m, int n, int my_rank, int p){
         }
         
         snprintf(prompt, PROMPT_LEN, "Recieved matrix at process(%d) after (%d) batches",my_rank, i);
-        Print_matrix(prompt,&(local_A[0]), m, local_n);
+//        Print_matrix(prompt,&(local_A[0]), m, local_n);
     }
     free(local_A);
     free(global_row);

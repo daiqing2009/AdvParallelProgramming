@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Exclude Material of Class in respect to the copy right of course materials
+Lectures/
+Lessons/
+
+# Exclude editor specific settings
+.vscode/

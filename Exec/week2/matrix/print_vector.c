@@ -8,6 +8,7 @@ void Print_vector(char *title, float  local_y[] ,
         int p)
 {
     int   i;
+    //TODO: allocate memory according to size of m
     float temp_vector[MAX_ORDER];
 
     MPI_Gather(local_y, local_m, MPI_FLOAT, 

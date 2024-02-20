@@ -7,6 +7,7 @@ void Read_vector(char *prompt, float local_x[], int local_n,
         int my_rank, int p)
 {
     int   i;
+    //TODO: change to lenght of n: local_n * p
     float temp_vector[MAX_ORDER];
 
     if (my_rank == 0) 
