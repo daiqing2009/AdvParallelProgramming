@@ -3,13 +3,6 @@
  * where both do an MPI_Send followed by an MPI_Recv.
  * Then gradually increase the size of the message to see
  * how big it must become before the program runs out of buffer space and deadlocks.
-
- Compile and run:
-
- mpicc greetings.c -o greetings.x
- mpirun -np 4 ./greetings.x
-
-
 */
 #include "stdio.h"
 #include "stdlib.h"
@@ -43,15 +36,14 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int msgSize = INIT_MSG_SIZE * sizeof(int);
+    int msgSize = INIT_MSG_SIZE;
 
-    for (int iter = 1; iter < MAX_ITER; iter *= 2)
+    for (int iter = 0; iter < MAX_ITER; iter++)
     {
-        msgSize = iter * INIT_MSG_SIZE * sizeof(int);
-        int *message = (int*) malloc(msgSize);
+        int *message = (int*) malloc(msgSize* sizeof(int));
 
         /* toogle the process ID since only 2 of process */
-        source = my_rank % 2;
+        source = 1 - my_rank ;
         dest = source;
 
         printf("Sending message of size(%d) from proc(%d) to proc(%d)\n", msgSize, my_rank, dest );
@@ -60,6 +52,7 @@ int main(int argc, char *argv[])
         printf("Message of size(%d) recieved from proc(%d) to proc(%d)\n", msgSize, source, my_rank );
 
         free(message);
+        msgSize *= 2;
     }
 
     /* Shut down MPI */
