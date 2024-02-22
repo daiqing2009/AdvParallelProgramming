@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
   if (numtasks > 10)
   {
     printf("this program can only work with np less than 10");
+    MPI_Finalize();
     return EXIT_FAILURE;
   }
   prev = rank - 1;
