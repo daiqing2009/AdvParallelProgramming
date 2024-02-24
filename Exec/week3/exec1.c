@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 
     if (p != 2)
     {
-        printf("Aborted! Test for Deadlock runs on process num of 2");
+        printf("Aborted! Test for Deadlock runs on process num of 2\n");
         MPI_Finalize();
         return EXIT_FAILURE;
     }
