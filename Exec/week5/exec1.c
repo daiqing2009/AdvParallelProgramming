@@ -21,18 +21,18 @@ int main(int argc, char *argv[])
     int source, dest;
     int tag = 0;
     int i = 0;
-    int ranks[2] = {0, 1};
+    //tree rank
+    int ranks[3] = {0, 1, 2};
     char message[10]="PENDING";
     MPI_Group orig_group;
-    MPI_Group group_chain[2];
-    MPI_Comm comm_chain[2];
+    MPI_Group preGroup, postGroup;
+    MPI_Comm preComm, postComm;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     // TODO: check num of p is greater than 2
-    printf("program ready for proc(%d)\n", my_rank);
     /* buid up the comm chain */
     MPI_Comm_group(MPI_COMM_WORLD, &orig_group);
 
@@ -40,24 +40,24 @@ int main(int argc, char *argv[])
     {
         ranks[0] = my_rank - 1;
         ranks[1] = my_rank;
-        MPI_Group_incl(orig_group, 2, ranks, &group_chain[0]);
-        MPI_Comm_create(MPI_COMM_WORLD, group_chain[0], &comm_chain[0]);
-        printf("former comm_chain of proc(%d) created.\n", my_rank);
+        MPI_Group_incl(orig_group, 2, ranks, &preGroup);
+        MPI_Comm_create(MPI_COMM_WORLD, preGroup, &preComm);
+        printf("preComm of proc(%d) constructed.\n" , my_rank);
     }
     if (my_rank < p - 1)
     {
         ranks[0] = my_rank;
         ranks[1] = my_rank + 1;
-        MPI_Group_incl(orig_group, 2, ranks, &group_chain[1]);
-        MPI_Comm_create(MPI_COMM_WORLD, group_chain[1], &comm_chain[1]);
-        printf("latter comm_chain of proc(%d) created.\n", my_rank);
+        MPI_Group_incl(orig_group, 2, ranks, &postGroup);
+        MPI_Comm_create(MPI_COMM_WORLD, postGroup, &postComm);
+        printf("postComm of proc(%d) constructed .\n", my_rank);
     }
 
     /* transmit the messages along with the chain*/
     if (my_rank > 0)
     {
         source = 0;
-        MPI_Recv(message, MSG_LEN, MPI_CHAR, source, tag, comm_chain[0], MPI_STATUS_IGNORE);
+        MPI_Recv(message, MSG_LEN, MPI_CHAR, source, tag, preComm, MPI_STATUS_IGNORE);
         printf("proc(%d) recieved message (%.5s) via local comm\n", my_rank, message);
     }
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
             sprintf(message, "DONE");
         }
         dest = 1;
-        MPI_Send(message, MSG_LEN, MPI_CHAR, dest, tag, comm_chain[1]);
+        MPI_Send(message, MSG_LEN, MPI_CHAR, dest, tag, postComm);
         printf("proc(%d) sent message (%.5s) via local comm\n", my_rank, message);
     }
 

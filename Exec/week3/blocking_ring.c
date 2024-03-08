@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     tag1 = iter;
     tag2 = iter;
     // printf("rank %d before msgSize\n", rank);
-    char *recPre = (char *)malloc((msgSize+1) * sizeof(char));
-    char *recNext = (char *)malloc((msgSize+1) * sizeof(char));
+    char *recPre = (char *)malloc((msgSize) * sizeof(char));
+    char *recNext = (char *)malloc((msgSize) * sizeof(char));
     char *sendPre = (char *)malloc(msgSize * sizeof(char));
     char *sendNext = (char *)malloc(msgSize * sizeof(char));
     // printf("rank %d after msgSize\n", rank);
