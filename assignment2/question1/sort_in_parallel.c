@@ -6,84 +6,194 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <math.h>
 #include <string.h>
 #include "mpi.h"
 
-#define INIT_MSG_SIZE 67108864
-#define MAX_ITER 10
+#define PRE_POST_INT 5
+
+void merge(float arr1[], float arr2[], int n1, int n2, float arr3[]);
+
+int cmpfunc(const void *a, const void *b);
+
+void print_array(char *prompt, float arr[], int len);
 
 int main(int argc, char *argv[])
 {
-    int procNum, rank, next, prev, tag1 = 0, tag2 = 0;
+    int p, my_rank, N, i, j, tag1 = 0, tag2 = 0;
+    float *num_array, *sorted_array, *cat_array;
+    float *send_buf, *recv_buf;
+    int len_cat, len_recv;
+    char *prompt;
 
     MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &procNum);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    MPI_Request reqs[procNum - 1];
-    MPI_Status stats[procNum - 1];
-    /* TODO: Read the input of N */
+    MPI_Request reqs[p - 1];
+    // MPI_Status stats[p - 1];
+
+    /* Read the input of N */
+    if (my_rank == 0)
+    {
+        printf("Please enter the number of random array length N: \n");
+        scanf("%d", &N);
+        // TODO: make sure N must be bigger than Zero
+    }
+    MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     /* genarate Random Number array */
-    srand(rank);
-
-    /* dispatch number to corresponding process: 
-    process 0 has the random numbers between 0 and 1/p, 
-    process 1 has numbers between 1/p and 2/p, and so on until 
-    the last process has numbers between (p-1)/p and 1 */
-
-    /* sort on recieved batch of number via insert sort algorithm asynchronizedly */
-    
-    if (rank == 0)
-        prev = numtasks - 1;
-    if (rank == numtasks - 1)
-        next = 0;
-
-    int msgSize = INIT_MSG_SIZE;
-    for (int iter = 0; iter < MAX_ITER; iter++)
+    num_array = malloc(N * sizeof(float));
+    srand(my_rank); // make sure every random number have different seed
+    for (i = 0; i < N; i++)
     {
-        tag1 = iter;
-        tag2 = iter;
-        // printf("rank %d before msgSize\n", rank);
-        char *recPre = (char *)malloc(msgSize * sizeof(char));
-        char *recNext = (char *)malloc(msgSize * sizeof(char));
-        char *sendPre = (char *)malloc(msgSize * sizeof(char));
-        char *sendNext = (char *)malloc(msgSize * sizeof(char));
-        // printf("rank %d after msgSize\n", rank);
-        // make sure different iter will be recieved by corresponding buffer
-        int i = 0;
-        for (i = 0; i < msgSize; i++)
-        {
-            sendPre[i] = prev + '0';
-            sendNext[i] = next + '0';
-        }
-        printf("proc(%d):sendPre=%.10s... & sendNext = %.10s...\n", rank, sendPre, sendNext);
-
-        MPI_Irecv(recPre, msgSize, MPI_CHAR, prev, tag1,
-                  MPI_COMM_WORLD, &reqs[0]);
-        MPI_Irecv(recNext, msgSize, MPI_CHAR, next, tag2,
-                  MPI_COMM_WORLD, &reqs[1]);
-
-        MPI_Isend(sendPre, msgSize, MPI_CHAR, prev, tag2,
-                  MPI_COMM_WORLD, &reqs[2]);
-        MPI_Isend(sendNext, msgSize, MPI_CHAR, next, tag1,
-                  MPI_COMM_WORLD, &reqs[3]);
-
-        MPI_Waitall(4, reqs, stats);
-
-        printf("Proc(%d) communicated proc(%d) with tag(%d) and proc(%d) with tag(%d) of msgSize(%d) \n",
-               rank, prev, tag2, next, tag1, msgSize);
-        printf("proc(%d):recPre=%.10s... & recNext = %.10s...\n", rank, recPre, recNext);
-
-        free(recPre);
-        free(recNext);
-        free(sendPre);
-        free(sendNext);
-
-        msgSize = msgSize * 2;
+        num_array[i] = (float)rand() / (float)(RAND_MAX);
     }
+    sprintf(prompt, "The initial array of process(%d): ", my_rank);
+    print_array(prompt, num_array, N);
+
+    /* sort on the generated array*/
+    qsort(num_array, N, sizeof(float), cmpfunc);
+
+    sprintf(prompt, "The initial array of process(%d): ", my_rank);
+    print_array(prompt, num_array, N);
+
+    /* initial sendbuf for each process */
+    send_buf = malloc(p * N * sizeof(float));
+    int pre_bucket, cur_bucket = 0;
+    int offset = 0;
+    for (i = 0; i < N; i++)
+    {
+        cur_bucket = (int)floorf((float)p / num_array[i]);
+        send_buf[cur_bucket * N + offset] = num_array[i];
+
+        if (pre_bucket == cur_bucket)
+        {
+            offset++;
+        }
+        else if (pre_bucket < cur_bucket)
+        {
+            while (offset < N)
+            {
+                send_buf[cur_bucket * N + offset] = EOF;
+                offset++;
+            }
+            offset = 0;
+        }
+        else
+        {
+            free(num_array);
+            free(send_buf);
+
+            MPI_Finalize();
+            printf("error in bucket ");
+            return EXIT_FAILURE;
+        }
+    }
+
+    /* dispatch number to corresponding process*/
+    printf("sending arrayes to correspinding proceses from process(%d)", my_rank);
+
+    for (j = 0; j < p; j++)
+    {
+        if (j != my_rank)
+        {
+            MPI_Isend(&send_buf[j * N], N, MPI_FLOAT, j, tag1,
+                      MPI_COMM_WORLD, &reqs[j]);
+        }
+    }
+
+    /* sort on recieved batch of number asynchronizedly */
+    recv_buf = malloc(p * N * sizeof(float));
+    sorted_array = malloc(p * N * sizeof(float));
+    cat_array = malloc(p * N * sizeof(float));
+
+    printf("recieving arrayes from correspinding proceses to process(%d)", my_rank);
+    for (j = 0; j < p; j++)
+    {
+        MPI_Irecv(&recv_buf[j * N], N, MPI_FLOAT, j, tag2,
+                  MPI_COMM_WORLD, &reqs[j]);
+    }
+
+    /* merge recieved array(sorted) with existing cancacated array */
+    int proc_recv = -1;
+    for (j = 0; j < p; j++)
+    {
+        MPI_Waitany(p, reqs, &proc_recv, MPI_STATUS_IGNORE);
+
+        memcpy(cat_array, sorted_array, j * N * sizeof(float));
+        merge(cat_array, &recv_buf[proc_recv * N], j * N, N, sorted_array);
+    }
+
+    /* remove all dummy placer and print the end result*/
+    int len_sroted = 0;
+    /* purge EOFs in the array */
+    memcpy(cat_array, sorted_array, j * N * sizeof(float));
+    j = 0;
+    for (i = 0; i < p * N; i++)
+    {
+        if (cat_array[i] > EOF)
+        {
+            sorted_array[len_sroted] = cat_array[i];
+            len_sroted++;
+        }
+    }
+
+    sprintf(prompt, "The sorted array of process(%d): ", my_rank);
+    print_array(prompt, sorted_array, len_sroted);
+
+    free(sorted_array);
+    free(cat_array);
+    free(num_array);
+    free(send_buf);
+    free(recv_buf);
 
     MPI_Finalize();
     return EXIT_SUCCESS;
+}
+
+/**
+ * compare the integer array
+ */
+int cmpfunc(const void *a, const void *b)
+{
+    return (*(float *)a - *(float *)b);
+}
+
+/**
+ * Merge two already sorted array
+ */
+void merge(float arr1[], float arr2[], int n1, int n2, float arr3[])
+{
+    int i = 0, j = 0, k = 0;
+
+    while (i < n1 && j < n2)
+    {
+        if (arr1[i] < arr2[j])
+            arr3[k++] = arr1[i++];
+        else
+            arr3[k++] = arr2[j++];
+    }
+
+    while (i < n1)
+        arr3[k++] = arr1[i++];
+
+    while (j < n2)
+        arr3[k++] = arr2[j++];
+}
+
+/**
+ * print integer array in a human friendly way
+ */
+void print_array(char *prompt, float arr[], int len)
+{
+    char result[len * 6];
+    char num_ele[6];
+    int i = 0;
+    for (; i < len; i++)
+    {
+        sprintf(num_ele, "%.2f,", arr[i]);
+        strcat(result, num_ele);
+    }
+    printf("%s: %s", prompt, result);
 }
