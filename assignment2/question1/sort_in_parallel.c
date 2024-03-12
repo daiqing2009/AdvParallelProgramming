@@ -1,17 +1,18 @@
 /*
  * Sort random number in parallel
- * 1. Genereate random number in each processs independently
- * 2. Communicate to related process according to the value of numbers
- * 3. Sort within each process
+ * Refer to README for details
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <time.h>
 #include "mpi.h"
 
-#define PRE_POST_INT 5
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+#define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
+
+#define PRT_PREFIX 5
+#define PRT_APPENDIX 5
 
 void merge(float arr1[], float arr2[], int n1, int n2, float arr3[]);
 
@@ -132,13 +133,13 @@ int main(int argc, char *argv[])
             }
         }
         memcpy(cat_array, sorted_array, len_sroted * sizeof(float));
-        merge(cat_array, &recv_buf[j * N],len_sroted, i, sorted_array);
+        merge(cat_array, &recv_buf[j * N], len_sroted, i, sorted_array);
         len_sroted += i;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    sprintf(prompt, "The sorted array of process(%d):", my_rank);
+    sprintf(prompt, "The sorted array(len=%d) of process(%d):", len_sroted, my_rank);
     print_array(prompt, sorted_array, len_sroted);
 
     free(sorted_array);
@@ -194,11 +195,27 @@ void print_array(char *prompt, float arr[], int len)
 {
     char result[len * 8];
     char num_ele[8];
-    int i = 0;
-    for (; i < len; i++)
+    int i;
+
+    int print_head = MIN(len, PRT_PREFIX);
+    for (i = 0; i < print_head; i++)
     {
         sprintf(num_ele, "%.3f,", arr[i]);
         strcat(result, num_ele);
     }
+    if (PRT_PREFIX + PRT_APPENDIX < len)
+    {
+        strcat(result, "...");
+    }
+    int print_tail = len > PRT_APPENDIX ? MIN(PRT_APPENDIX, len - PRT_PREFIX) : 0;
+    for (i = len - print_tail; i < len; i++)
+    {
+        sprintf(num_ele, "%.3f,", arr[i]);
+        strcat(result, num_ele);
+    }
+    if (strlen(result) > 0)
+        result[strlen(result) - 1] = '\0';
+    else
+       strcat(result, "(Empty)");
     printf("%s %s \n", prompt, result);
 }

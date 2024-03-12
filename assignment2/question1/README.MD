@@ -5,9 +5,15 @@ Then implement a sorting algorithm where each process sorts the sequence of numb
 
 ## Logic of the program
 ### frame work of overall program
-The 
+The overall framework of the program can be as simple as following:
+1. Initialize the sequence of floating numbers and sort within process
+2. Distribute numbers to corresponding processes according to the requirement
+3. Merge distributed number from different processes and print the result
 ### key code segment
-
+There are major challenges I encountered or trickes i used in coding
+* utilized the merchanism of 
+``
+* use merge on 
 ## Performance analysis
 ### Thoeratical Calculation 
 
