@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     float *num_array, *sorted_array, *cat_array;
     float *send_buf, *recv_buf;
     int len_cat, len_recv;
-    char *prompt;
+    char prompt[50];
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
@@ -43,19 +43,21 @@ int main(int argc, char *argv[])
     MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     /* genarate Random Number array */
+    printf("Initializing the array of len(%d) for proc(%d) \n", N, my_rank);
+
     num_array = malloc(N * sizeof(float));
     srand(my_rank); // make sure every random number have different seed
     for (i = 0; i < N; i++)
     {
         num_array[i] = (float)rand() / (float)(RAND_MAX);
     }
-    sprintf(prompt, "The initial array of process(%d): ", my_rank);
+    sprintf(prompt, "The initialized array of process(%d) ", my_rank);
     print_array(prompt, num_array, N);
 
     /* sort on the generated array*/
     qsort(num_array, N, sizeof(float), cmpfunc);
 
-    sprintf(prompt, "The initial array of process(%d): ", my_rank);
+    sprintf(prompt, "Locally sorted initialized array of process(%d)  ", my_rank);
     print_array(prompt, num_array, N);
 
     /* initial sendbuf for each process */
@@ -92,7 +94,7 @@ int main(int argc, char *argv[])
     }
 
     /* dispatch number to corresponding process*/
-    printf("sending arrayes to correspinding proceses from process(%d)", my_rank);
+    printf("sending arrayes to correspinding proceses from process(%d)\n", my_rank);
 
     for (j = 0; j < p; j++)
     {
@@ -108,7 +110,7 @@ int main(int argc, char *argv[])
     sorted_array = malloc(p * N * sizeof(float));
     cat_array = malloc(p * N * sizeof(float));
 
-    printf("recieving arrayes from correspinding proceses to process(%d)", my_rank);
+    printf("recieving arrayes from correspinding proceses to process(%d)\n", my_rank);
     for (j = 0; j < p; j++)
     {
         MPI_Irecv(&recv_buf[j * N], N, MPI_FLOAT, j, tag2,
@@ -157,7 +159,13 @@ int main(int argc, char *argv[])
  */
 int cmpfunc(const void *a, const void *b)
 {
-    return (*(float *)a - *(float *)b);
+    if (*(float *)a < *(float *)b)
+        return -1;
+    if (*(float *)a == *(float *)b)
+        return 0;
+    if (*(float *)a > *(float *)b)
+        return 1;
+    return 0;
 }
 
 /**
@@ -187,13 +195,13 @@ void merge(float arr1[], float arr2[], int n1, int n2, float arr3[])
  */
 void print_array(char *prompt, float arr[], int len)
 {
-    char result[len * 6];
-    char num_ele[6];
+    char result[len * 8];
+    char num_ele[8];
     int i = 0;
     for (; i < len; i++)
     {
-        sprintf(num_ele, "%.2f,", arr[i]);
+        sprintf(num_ele, "%.3f,", arr[i]);
         strcat(result, num_ele);
     }
-    printf("%s: %s", prompt, result);
+    printf("%s: %s \n", prompt, result);
 }

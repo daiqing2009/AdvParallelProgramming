@@ -58,3 +58,6 @@ Lessons/
 
 # Exclude editor specific settings
 .vscode/
+
+# Generated artifects
+*.data
