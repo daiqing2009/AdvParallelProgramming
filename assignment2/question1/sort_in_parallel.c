@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     /* sort on the generated array*/
     qsort(num_array, N, sizeof(float), cmpfunc);
 
-    sprintf(prompt, "Locally sorted initialized array(len=%d) of process(%d)  ", N, my_rank);
+    sprintf(prompt, "Locally sorted initialized array(len=%d) of process(%d):", N, my_rank);
     print_array(prompt, num_array, N);
 
     /* initial sendbuf for each process */
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
                 offset++;
             }
             offset = 0;
-            pre_bucket ++;
+            pre_bucket++;
         }
         send_buf[cur_bucket * N + offset] = num_array[i];
         offset++;
@@ -94,16 +94,13 @@ int main(int argc, char *argv[])
     } while (cur_bucket <= p);
 
     /* dispatch number to corresponding process*/
-    sprintf(prompt, "sending arrayes to correspinding proceses from process(%d)\n", my_rank);
-    print_array(prompt, send_buf, N * p);
+    // sprintf(prompt, "sending arrayes to correspinding proceses from process(%d)\n", my_rank);
+    // print_array(prompt, send_buf, N * p);
 
     for (j = 0; j < p; j++)
     {
-        if (j != my_rank)
-        {
-            MPI_Isend(&send_buf[j * N], N, MPI_FLOAT, j, tag1,
-                      MPI_COMM_WORLD, &reqs[j]);
-        }
+        MPI_Isend(&send_buf[j * N], N, MPI_FLOAT, j, tag1,
+                  MPI_COMM_WORLD, &reqs[j]);
     }
 
     /* sort on recieved batch of number asynchronizedly */
@@ -119,16 +116,11 @@ int main(int argc, char *argv[])
     int proc_recv = -1;
     sorted_array = malloc(p * N * sizeof(float));
     cat_array = malloc(p * N * sizeof(float));
-    /* copy the remaining part that don't need to send*/
-    memcpy(sorted_array, &send_buf[my_rank * N], N * sizeof(float));
 
-    sprintf(prompt, "The initialzied sorted array of process(%d): ", my_rank);
-    print_array(prompt, sorted_array, p* N);
-
-    for (j = 1; j < p; j++)
+    for (j = 0; j < p; j++)
     {
         MPI_Waitany(p, reqs, &proc_recv, MPI_STATUS_IGNORE);
-        // sprintf(prompt, "recieved one response form proc(%d)", proc_recv);
+        // sprintf(prompt, "recieved one response form proc(%d) to (%d)", proc_recv, my_rank);
         // print_array(prompt, &recv_buf[proc_recv * N], N);
         memcpy(cat_array, sorted_array, j * N * sizeof(float));
         merge(cat_array, &recv_buf[proc_recv * N], j * N, N, sorted_array);
@@ -149,8 +141,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    sprintf(prompt, "The sorted array of process(%d): ", my_rank);
+    sprintf(prompt, "The sorted array of process(%d):", my_rank);
     print_array(prompt, sorted_array, len_sroted);
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     free(sorted_array);
     free(cat_array);
@@ -211,5 +205,5 @@ void print_array(char *prompt, float arr[], int len)
         sprintf(num_ele, "%.3f,", arr[i]);
         strcat(result, num_ele);
     }
-    printf("%s: %s \n", prompt, result);
+    printf("%s %s \n", prompt, result);
 }
