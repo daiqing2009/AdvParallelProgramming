@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     float *num_array, *sorted_array, *cat_array;
     float *send_buf, *recv_buf;
     int len_cat, len_recv;
-    char prompt[50];
+    char prompt[70];
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
@@ -51,8 +51,8 @@ int main(int argc, char *argv[])
     {
         num_array[i] = (float)rand() / (float)(RAND_MAX);
     }
-    sprintf(prompt, "The initialized array of process(%d) ", my_rank);
-    print_array(prompt, num_array, N);
+    // sprintf(prompt, "The initialized array of process(%d) ", my_rank);
+    // print_array(prompt, num_array, N);
 
     /* sort on the generated array*/
     qsort(num_array, N, sizeof(float), cmpfunc);
@@ -66,21 +66,22 @@ int main(int argc, char *argv[])
     int offset = 0;
     for (i = 0; i < N; i++)
     {
-        cur_bucket = (int)floorf((float)p / num_array[i]);
-        send_buf[cur_bucket * N + offset] = num_array[i];
+        cur_bucket = (int)floorf(p * num_array[i]);
 
         if (pre_bucket == cur_bucket)
         {
+            send_buf[cur_bucket * N + offset] = num_array[i];
             offset++;
         }
         else if (pre_bucket < cur_bucket)
         {
             while (offset < N)
             {
-                send_buf[cur_bucket * N + offset] = EOF;
+                send_buf[pre_bucket * N + offset] = EOF;
                 offset++;
             }
             offset = 0;
+            send_buf[cur_bucket * N + offset] = num_array[i];
         }
         else
         {
@@ -88,13 +89,25 @@ int main(int argc, char *argv[])
             free(send_buf);
 
             MPI_Finalize();
-            printf("error in bucket ");
+            printf(" Error: pre_bucket should NOT be larger than  ");
             return EXIT_FAILURE;
         }
     }
+    /* fill remaining bucket*/
+    do
+    {
+        while (offset < N)
+        {
+            offset++;
+            send_buf[cur_bucket * N + offset] = EOF;
+        }
+        cur_bucket++;
+        offset = -1; // counter effect the offset incrementatl 
+    } while (cur_bucket <= p);
 
     /* dispatch number to corresponding process*/
-    printf("sending arrayes to correspinding proceses from process(%d)\n", my_rank);
+    sprintf(prompt, "sending arrayes to correspinding proceses from process(%d)\n", my_rank);
+    print_array(prompt, send_buf, N * p);
 
     for (j = 0; j < p; j++)
     {
@@ -107,10 +120,7 @@ int main(int argc, char *argv[])
 
     /* sort on recieved batch of number asynchronizedly */
     recv_buf = malloc(p * N * sizeof(float));
-    sorted_array = malloc(p * N * sizeof(float));
-    cat_array = malloc(p * N * sizeof(float));
-
-    printf("recieving arrayes from correspinding proceses to process(%d)\n", my_rank);
+    // printf("recieving arrayes from correspinding proceses to process(%d)\n", my_rank);
     for (j = 0; j < p; j++)
     {
         MPI_Irecv(&recv_buf[j * N], N, MPI_FLOAT, j, tag2,
@@ -119,19 +129,23 @@ int main(int argc, char *argv[])
 
     /* merge recieved array(sorted) with existing cancacated array */
     int proc_recv = -1;
-    for (j = 0; j < p; j++)
+    sorted_array = malloc(p * N * sizeof(float));
+    cat_array = malloc(p * N * sizeof(float));
+    for (j = 0; j < p - 1; j++)
     {
         MPI_Waitany(p, reqs, &proc_recv, MPI_STATUS_IGNORE);
-
+        sprintf(prompt, "recieved one response form proc(%d)", proc_recv);
+        print_array(prompt, &recv_buf[proc_recv * N], N);
         memcpy(cat_array, sorted_array, j * N * sizeof(float));
         merge(cat_array, &recv_buf[proc_recv * N], j * N, N, sorted_array);
     }
+    sprintf(prompt, "The sorted array of process(%d) before purge: ", my_rank);
+    print_array(prompt, sorted_array, N);
 
     /* remove all dummy placer and print the end result*/
     int len_sroted = 0;
     /* purge EOFs in the array */
     memcpy(cat_array, sorted_array, j * N * sizeof(float));
-    j = 0;
     for (i = 0; i < p * N; i++)
     {
         if (cat_array[i] > EOF)
