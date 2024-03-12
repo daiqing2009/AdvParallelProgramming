@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     /* genarate Random Number array */
-    printf("Initializing the array of len(%d) for proc(%d) \n", N, my_rank);
+    // printf("Initializing the array of len(%d) for proc(%d) \n", N, my_rank);
 
     num_array = malloc(N * sizeof(float));
     srand(my_rank); // make sure every random number have different seed
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     /* sort on the generated array*/
     qsort(num_array, N, sizeof(float), cmpfunc);
 
-    sprintf(prompt, "Locally sorted initialized array of process(%d)  ", my_rank);
+    sprintf(prompt, "Locally sorted initialized array(len=%d) of process(%d)  ", N, my_rank);
     print_array(prompt, num_array, N);
 
     /* initial sendbuf for each process */
@@ -68,12 +68,7 @@ int main(int argc, char *argv[])
     {
         cur_bucket = (int)floorf(p * num_array[i]);
 
-        if (pre_bucket == cur_bucket)
-        {
-            send_buf[cur_bucket * N + offset] = num_array[i];
-            offset++;
-        }
-        else if (pre_bucket < cur_bucket)
+        while (pre_bucket < cur_bucket)
         {
             while (offset < N)
             {
@@ -81,28 +76,21 @@ int main(int argc, char *argv[])
                 offset++;
             }
             offset = 0;
-            send_buf[cur_bucket * N + offset] = num_array[i];
+            pre_bucket ++;
         }
-        else
-        {
-            free(num_array);
-            free(send_buf);
-
-            MPI_Finalize();
-            printf(" Error: pre_bucket should NOT be larger than  ");
-            return EXIT_FAILURE;
-        }
+        send_buf[cur_bucket * N + offset] = num_array[i];
+        offset++;
     }
     /* fill remaining bucket*/
     do
     {
         while (offset < N)
         {
-            offset++;
             send_buf[cur_bucket * N + offset] = EOF;
+            offset++;
         }
         cur_bucket++;
-        offset = -1; // counter effect the offset incrementatl 
+        offset = 0;
     } while (cur_bucket <= p);
 
     /* dispatch number to corresponding process*/
@@ -131,16 +119,22 @@ int main(int argc, char *argv[])
     int proc_recv = -1;
     sorted_array = malloc(p * N * sizeof(float));
     cat_array = malloc(p * N * sizeof(float));
-    for (j = 0; j < p - 1; j++)
+    /* copy the remaining part that don't need to send*/
+    memcpy(sorted_array, &send_buf[my_rank * N], N * sizeof(float));
+
+    sprintf(prompt, "The initialzied sorted array of process(%d): ", my_rank);
+    print_array(prompt, sorted_array, p* N);
+
+    for (j = 1; j < p; j++)
     {
         MPI_Waitany(p, reqs, &proc_recv, MPI_STATUS_IGNORE);
-        sprintf(prompt, "recieved one response form proc(%d)", proc_recv);
-        print_array(prompt, &recv_buf[proc_recv * N], N);
+        // sprintf(prompt, "recieved one response form proc(%d)", proc_recv);
+        // print_array(prompt, &recv_buf[proc_recv * N], N);
         memcpy(cat_array, sorted_array, j * N * sizeof(float));
         merge(cat_array, &recv_buf[proc_recv * N], j * N, N, sorted_array);
     }
-    sprintf(prompt, "The sorted array of process(%d) before purge: ", my_rank);
-    print_array(prompt, sorted_array, N);
+    // sprintf(prompt, "The sorted array of process(%d) before purge: ", my_rank);
+    // print_array(prompt, sorted_array, p* N);
 
     /* remove all dummy placer and print the end result*/
     int len_sroted = 0;
@@ -161,8 +155,8 @@ int main(int argc, char *argv[])
     free(sorted_array);
     free(cat_array);
     free(num_array);
-    free(send_buf);
     free(recv_buf);
+    free(send_buf);
 
     MPI_Finalize();
     return EXIT_SUCCESS;
