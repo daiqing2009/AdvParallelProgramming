@@ -11,8 +11,9 @@
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 
-#define PRT_PREFIX 5
-#define PRT_APPENDIX 5
+#define PRT_PREFIX      5
+#define PRT_APPENDIX    5
+#define PRT_PRECISION   "%.4f,"
 
 void merge(float arr1[], float arr2[], int n1, int n2, float arr3[]);
 
@@ -194,13 +195,15 @@ void merge(float arr1[], float arr2[], int n1, int n2, float arr3[])
 void print_array(char *prompt, float arr[], int len)
 {
     char result[len * 8];
+    /* remove the influence between different calls!*/
+    result[0] = '\0';
+
     char num_ele[8];
     int i;
-
     int print_head = MIN(len, PRT_PREFIX);
     for (i = 0; i < print_head; i++)
     {
-        sprintf(num_ele, "%.3f,", arr[i]);
+        sprintf(num_ele, PRT_PRECISION, arr[i]);
         strcat(result, num_ele);
     }
     if (PRT_PREFIX + PRT_APPENDIX < len)
@@ -210,7 +213,7 @@ void print_array(char *prompt, float arr[], int len)
     int print_tail = len > PRT_APPENDIX ? MIN(PRT_APPENDIX, len - PRT_PREFIX) : 0;
     for (i = len - print_tail; i < len; i++)
     {
-        sprintf(num_ele, "%.3f,", arr[i]);
+        sprintf(num_ele, PRT_PRECISION, arr[i]);
         strcat(result, num_ele);
     }
     if (strlen(result) > 0)
