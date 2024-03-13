@@ -24,7 +24,7 @@ int main()
     {
         for (jp = 0; jp < n; jp++)
         {
-            a[ip * m + jp] = ip * m + jp;
+            a[ip * n + jp] = ip * n + jp;
         }
     }
 
@@ -46,7 +46,7 @@ int main()
 
 int constructB(int ip, int jp, int m, int n, int *a, int *b)
 {
-    int last_row = -1, last_col= -1, value = 0;
+    int last_row = -1, last_col = -1, value = 0;
     // #pragma opm task shared(last_row) firstprivate(ip, jp)
     if (ip > 0)
     {
@@ -61,11 +61,15 @@ int constructB(int ip, int jp, int m, int n, int *a, int *b)
         value += last_col;
     }
     // #pragma omp taskwait
-    value += a[ip * m + jp];
+    value += a[ip * n + jp];
+    // printf("B(%d,%d) = %d\n", ip, jp ,value);
     if (ip > 0 && jp > 0)
-        value -= a[(ip - 1) * m + jp - 1];
+    {
+        // printf("ready to minute a(%d,%d) = %d\n", ip - 1, jp - 1 ,a[(ip - 1) * m + jp - 1]);
+        value -= constructB(ip-1, jp - 1, m, n, a, b);
+    }
 
-    b[ip * m + jp] = value;
+    b[ip * n + jp] = value;
     return value;
 }
 
@@ -78,7 +82,7 @@ void print_matrix(char *prompt, int *mat, int m, int n)
     {
         for (j = 0; j < n; j++)
         {
-            printf("%d\t", mat[i * m + j]);
+            printf("%d\t", mat[i * n + j]);
         }
         printf("\n");
     }
