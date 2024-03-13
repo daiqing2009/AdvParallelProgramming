@@ -32,21 +32,23 @@ To make the parallelism worthwile, according to "Isoefficiency function(`𝑁 = 
 `Tp = n*log(n)*T(sort) + n*p*T(comm) + n*p*(3/2)T(sort)`
 .where `T(sort)` is the unit time for sort and `T(comm)` is the time for single communication
 
-To archieve different level of efficienty(use spead-up ratio for easy to understand), N need to be big enough as described in a table as follows, where `S=Ts/Tp`, and `log(n) = (T(comm)/T(sort)+3*S/2-log(p))/(1-S/p)`:
+To archieve different level of efficienty(use spead-up ratio for easy to understand), N need to be big enough as described in a table as follows, where `S=Ts/Tp`, and `log2(n) = (T(comm)/T(sort)+3*S/2-log2(p))/(1-S/p)`:
 | S\P | P=10 | P=20 | P=40 |
 | -------- | ------- | -------- | ------- |
-| S=8 | E=0.8, N= 100 | E=0.4, N= | E=0.2, N=|
-| S=16 | N/A | E=0.8,N= | E=0.4, N= |
-| S= 32 | N/A | N/A | E=0.8, N= |
-let T(comm)/T(sort) = 15, rounding to nearest 100.
+| S=8 |  N=2^30 | N= 2^8.6 | N= 2^5.2 |
+| S=16 | N/A | N= 2^26| N= 2^6.9 |
+| S= 32 | N/A | N/A | N= 2^20.9 |
+let T(comm)/T(sort) = 8, rounding to nearest 10,000
 
 ### Lab Experiment on Server
 #### P=10
-
+![alt text](p10.png)
 
 #### P=20
+![alt text](p20.png)
 
 #### P=40
+![alt text](p40.png)
 
 ### Lab Experiment on Server
-After lab experiment, we can 
+After lab experiment, we can found the communication time rises with more processes involved in the calculation.
