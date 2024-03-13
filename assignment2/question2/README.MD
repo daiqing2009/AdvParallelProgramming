@@ -9,9 +9,24 @@ We want to compute an array B, were element B(i,j) is the sum of all elements in
 
 ## Logic 
 ### framework of program
-### key code segment
-
+#### key code segment
+As explained in class, the tricky part is the following code:
+`    for (ip = 0; ip < m; ip++)
+    {
+        for (jp = 0; jp < n; jp++)
+        {
+            if (jp == 0)
+                b[ip * m + jp] = b[(ip - 1) * m + jp] + a[ip * m + jp];
+            else if (ip == 0)
+                b[ip * m + jp] = b[ip * m + jp - 1] + a[ip * m + jp];
+            else
+                b[ip * m + jp] = b[(ip - 1) * m + jp] + b[ip * m + jp - 1] + a[ip * m + jp];
+        }
+    }`
+Element in matrix B can be calculated from "nearest box"
+![alt text](serial.png)
+#### How to parallelize the code
+* task per entry
+* task per block
 ## Performance analysis
-### Theoratical Calculation 
-
-### Lab Experiment
+Failed to analyze in detail due to lack of time
