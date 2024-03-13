@@ -38,7 +38,7 @@ To archieve different level of efficienty(use spead-up ratio for easy to underst
 | S=8 |  N=2^30 | N= 2^8.6 | N= 2^5.2 |
 | S=16 | N/A | N= 2^26| N= 2^6.9 |
 | S= 32 | N/A | N/A | N= 2^20.9 |
-let T(comm)/T(sort) = 8, rounding to nearest 10,000
+let T(comm)/T(sort) = 8
 
 ### Lab Experiment on Server
 #### P=10
