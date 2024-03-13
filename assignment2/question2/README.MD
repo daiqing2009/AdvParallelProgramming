@@ -10,29 +10,20 @@ We want to compute an array B, were element B(i,j) is the sum of all elements in
 ## Logic 
 ### framework of program
 #### key code segment
-As explained in class, the tricky part is the following code:
-`    for (ip = 0; ip < m; ip++)
-    {
-        for (jp = 0; jp < n; jp++)
-        {
-            if (jp == 0)
-                b[ip * m + jp] = b[(ip - 1) * m + jp] + a[ip * m + jp];
-            else if (ip == 0)
-                b[ip * m + jp] = b[ip * m + jp - 1] + a[ip * m + jp];
-            else
-                b[ip * m + jp] = b[(ip - 1) * m + jp] + b[ip * m + jp - 1] + a[ip * m + jp];
-        }
-    }`
+As explained in class, the tricky part is that it can be used constructed in a recursive form. 
 Element in matrix B can be calculated from "nearest box"
 ![alt text](serial.png)
 #### How to parallelize the code
 * task per entry
-Construct into recursive way
 Simliar to fabonacci sequence by recursion, such probelm can be viewed as 2D fabonacci sequence
+
+
 * task per block
+Haven't figured out how to do that. 
 
 ## Performance analysis
 ### serial vs task
 
+
 ### task vs block
-it is more challenging
+it is more challenging to be finished tonight

@@ -28,45 +28,49 @@ int main()
         }
     }
 
-    print_matrix("Matrix A:", a, m, n);
+    // print_matrix("Matrix A:", a, m, n);
     /* contrauct B */
     b = malloc(m * n * sizeof(int));
     /* construct matrix B in a recursive way*/
-    //     omp_set_dynamic(0);
-    //     omp_set_num_threads(4);
-    // #pragma omp parallel shared(m, n, a, b)
-    // {
-    constructB(m - 1, n - 1, m, n, a, b);
-    // #pragma omp single
-    print_matrix("Matrix B:", b, m, n);
-    // }
+    omp_set_dynamic(0);
+    omp_set_num_threads(4);
+    #pragma omp parallel shared(m, n, a, b) 
+    {
+        constructB(m - 1, n - 1, m, n, a, b);
+        // #pragma omp single
+        // print_matrix("Matrix B:", b, m, n);
+    }
 
     return 0;
 }
 
 int constructB(int ip, int jp, int m, int n, int *a, int *b)
 {
-    int last_row = -1, last_col = -1, value = 0;
-    // #pragma opm task shared(last_row) firstprivate(ip, jp)
+    int last_row = 0, last_col = 0, diagnal =0, value = 0;
     if (ip > 0)
     {
+        #pragma opm task shared(last_row) firstprivate(ip, jp)
         last_row = constructB(ip - 1, jp, m, n, a, b);
+        #pragma omp taskwait
         value += last_row;
     }
 
-    // #pragma opm task shared(last_col) firstprivate(ip, jp)
     if (jp > 0)
     {
+        #pragma opm task shared(last_col) firstprivate(ip, jp)
         last_col = constructB(ip, jp - 1, m, n, a, b);
+        #pragma omp taskwait
         value += last_col;
     }
-    // #pragma omp taskwait
     value += a[ip * n + jp];
     // printf("B(%d,%d) = %d\n", ip, jp ,value);
     if (ip > 0 && jp > 0)
     {
+        #pragma opm task shared(diagnal) firstprivate(ip, jp)
         // printf("ready to minute a(%d,%d) = %d\n", ip - 1, jp - 1 ,a[(ip - 1) * m + jp - 1]);
-        value -= constructB(ip-1, jp - 1, m, n, a, b);
+        diagnal = constructB(ip - 1, jp - 1, m, n, a, b);
+        #pragma omp taskwait
+        value -= diagnal;
     }
 
     b[ip * n + jp] = value;
