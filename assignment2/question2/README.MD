@@ -27,6 +27,12 @@ Element in matrix B can be calculated from "nearest box"
 ![alt text](serial.png)
 #### How to parallelize the code
 * task per entry
+Construct into recursive way
+Simliar to fabonacci sequence by recursion, such probelm can be viewed as 2D fabonacci sequence
 * task per block
+
 ## Performance analysis
-Failed to analyze in detail due to lack of time
+### serial vs task
+
+### task vs block
+it is more challenging
