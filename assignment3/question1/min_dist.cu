@@ -10,16 +10,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <thrust/device_vector.h>
-#include <thrust/reduce.h>
-#include <thrust/execution_policy.h>
-
 // Number of threads in one block (possible range is 32...1024):
 #define BLOCK_SIZE 256
 
 // Total number of threads (total number of elements to process in the kernel):
 // #define INIT_NMAX
-#define NMAX 512
+#define NMAX 65536
 
 // Number of times to run the test (for scaling of dataset):
 #define NTESTS 3
@@ -124,7 +120,7 @@ int main(int argc, char **argv)
     struct timeval tdr0, tdr1, tdr2, tdr3;
     double cputime, k1time, k2time;
     double min0;
-    float next_dist,min;
+    float next_dist, min;
     int error;
     // int NMAX;
     int NBLOCKS;
@@ -135,8 +131,6 @@ int main(int argc, char **argv)
         // double NMAX every time
         // NMAX = INIT_NMAX * (int)pow(2, kk);
         // printf("NMAX = %d", NMAX);
-
-        NBLOCKS = NMAX * (NMAX - 1) / BLOCK_SIZE;
 
         // allocate CPU memory
         // h_X = (float *)malloc(NMAX * sizeof(float));
@@ -158,7 +152,7 @@ int main(int argc, char **argv)
         }
 
         // print first few particles
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 3; i++)
             printf("No %d of particle pair: (%.4f, %.4f)\n", i, h_X[i], h_Y[i]);
 
         // Computer distances in a CPU serial function
@@ -175,9 +169,7 @@ int main(int argc, char **argv)
                 next_dist = sqrt(SQUARE(h_X[i] - h_X[j]) + SQUARE(h_Y[i] - h_Y[j]));
                 min0 = (next_dist < min0) ? next_dist : min0;
             }
-            // h_dist[i * NMAX + j] = sqrt(SQUARE(h_X[i] - h_X[j]) + SQUARE(h_Y[i] - h_Y[j]));
         }
-        printf("min0=%.8f\n", min0);
 
         gettimeofday(&tdr1, NULL);
 
@@ -203,6 +195,7 @@ int main(int argc, char **argv)
         gettimeofday(&tdr2, NULL);
 
         // Hybrid binary/atomic reduction:
+        NBLOCKS = NMAX / BLOCK_SIZE;
         OneThreadPerParticleKernel<<<NBLOCKS, BLOCK_SIZE>>>();
 
         gettimeofday(&tdr3, NULL);
@@ -222,7 +215,8 @@ int main(int argc, char **argv)
             exit(error);
         }
 
-        printf("Min: %e (relative error %e)\n", min, fabs((double)min - min0) / min0);
+        printf("Min distance between %d particle pair: GPU kerneal1(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min, min0, fabs((double)min - min0) / min0);
+        // printf("Min distance between %d particle pair: GPU kerneal1(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min, min0, fabs((double)min - min0) / min0);
 
         timeval_subtract(&cputime, &tdr1, &tdr0);
         printf("CPU Time: %e\n", cputime);
