@@ -18,25 +18,25 @@
 #define BLOCK_SIZE 256
 
 // Total number of threads (total number of elements to process in the kernel):
-#define INIT_NMAX 4096
+// #define INIT_NMAX
+#define NMAX 512
 
 // Number of times to run the test (for scaling of dataset):
 #define NTESTS 3
 
-// Maximum value of
-#define MAX_DIST 1.41
+// Maximum value of distance
+#define MAX_DIST 1.42
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define SQUARE(X) ((X) * (X))
 
-#define NMAX INIT_NMAX * 2
 // Input array (global host memory):
 // float *h_X;
 // float *h_Y;
 // float *h_dist;
 float h_X[NMAX];
 float h_Y[NMAX];
-float h_dist[NMAX * (NMAX - 1)];
+// float h_dist[NMAX * NMAX];
 
 __device__ float d_X[NMAX];
 __device__ float d_Y[NMAX];
@@ -47,7 +47,7 @@ __device__ float d_min;
 int timeval_subtract(double *result, struct timeval *x, struct timeval *y);
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-__device__ static float fatomicMin(float *addr, float value)
+static inline __device__ float fatomicMin(float *addr, float value)
 {
     float old = *addr, assumed;
     if (old <= value)
@@ -74,18 +74,19 @@ __global__ void OneThreadPerParticleKernel()
     __shared__ float b_min[BLOCK_SIZE];
 
     int i = threadIdx.x + blockDim.x * blockIdx.x;
-    float thread_min, next_dist = MAX_DIST;
+    float thread_min = MAX_DIST, next_dist = MAX_DIST;
 
     // Not needed, because NMAX is a power of two:
     // if (i >= NMAX)
     //     return;
 
     // calculate the distance related to i and find the min of current thread
-    for (int j = i + 1; j < BLOCK_SIZE; j += 2)
+    for (int j = i + 1; j < NMAX; j++)
     {
         next_dist = sqrt(SQUARE(d_X[i] - d_X[j]) + SQUARE(d_Y[i] - d_Y[j]));
         thread_min = (next_dist < thread_min) ? next_dist : thread_min;
     }
+    b_min[threadIdx.x] = thread_min;
 
     // To make sure all threads finished calc
     __syncthreads();
@@ -123,7 +124,7 @@ int main(int argc, char **argv)
     struct timeval tdr0, tdr1, tdr2, tdr3;
     double cputime, k1time, k2time;
     double min0;
-    float min;
+    float next_dist,min;
     int error;
     // int NMAX;
     int NBLOCKS;
@@ -146,9 +147,8 @@ int main(int argc, char **argv)
         // cudaMalloc((void **)&d_Y, NMAX * sizeof(float));
         // cudaMalloc((void **)&d_dist, NMAX * (NMAX - 1) * sizeof(float));
 
-        // We don't initialize randoms, because we want to compare different strategies:
         // Initializing random number generator:
-        srand(kk);
+        srand(kk + 1);
 
         // Initializing the input array:
         for (int i = 0; i < NMAX; i++)
@@ -157,23 +157,27 @@ int main(int argc, char **argv)
             h_Y[i] = (float)rand() / (float)RAND_MAX;
         }
 
+        // print first few particles
+        for (int i = 0; i < 5; i++)
+            printf("No %d of particle pair: (%.4f, %.4f)\n", i, h_X[i], h_Y[i]);
+
         // Computer distances in a CPU serial function
         gettimeofday(&tdr0, NULL);
 
-        for (int i = 0; i > NMAX - 1; i++)
-        {
-            // only need to calculate the upper half of the diagnal matrix
-            for (int j = 0; j < i; j++)
-                h_dist[i * NMAX + j] = MAX_DIST;
-            for (int j = i; j < NMAX; j++)
-                h_dist[i * NMAX + j] = sqrt(SQUARE(h_X[i] - h_X[j]) + SQUARE(h_Y[i] - h_Y[j]));
-        }
-
         // Find the minimal in serial way
         min0 = MAX_DIST;
-        for (int i = 0; i < (NMAX - 1) * NMAX; i++)
-            if (h_dist[i] < min0)
-                min0 = (double)h_dist[i];
+        next_dist = MAX_DIST;
+        for (int i = 0; i < NMAX; i++)
+        {
+            // only need to calculate the upper half of the diagnal matrix
+            for (int j = i + 1; j < NMAX; j++)
+            {
+                next_dist = sqrt(SQUARE(h_X[i] - h_X[j]) + SQUARE(h_Y[i] - h_Y[j]));
+                min0 = (next_dist < min0) ? next_dist : min0;
+            }
+            // h_dist[i * NMAX + j] = sqrt(SQUARE(h_X[i] - h_X[j]) + SQUARE(h_Y[i] - h_Y[j]));
+        }
+        printf("min0=%.8f\n", min0);
 
         gettimeofday(&tdr1, NULL);
 
