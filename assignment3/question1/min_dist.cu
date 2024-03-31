@@ -15,7 +15,7 @@
 
 // Total number of threads (total number of elements to process in the kernel):
 // #define INIT_NMAX
-#define NMAX 65536
+#define NMAX 1024
 
 // Number of times to run the test (for scaling of dataset):
 #define NTESTS 3
@@ -27,17 +27,13 @@
 #define SQUARE(X) ((X) * (X))
 
 // Input array (global host memory):
-// float *h_X;
-// float *h_Y;
-// float *h_dist;
 float h_X[NMAX];
 float h_Y[NMAX];
-// float h_dist[NMAX * NMAX];
 
 __device__ float d_X[NMAX];
 __device__ float d_Y[NMAX];
-// __device__ float *d_dist;
-__device__ float d_min;
+__device__ float d_min_k1;
+__device__ float d_min_k2;
 
 // It messes up with y!
 int timeval_subtract(double *result, struct timeval *x, struct timeval *y);
@@ -59,7 +55,9 @@ static inline __device__ float fatomicMin(float *addr, float value)
 
 __global__ void init_kernel()
 {
-    d_min = MAX_DIST;
+    d_min_k1 = MAX_DIST;
+    d_min_k2 = MAX_DIST;
+
     return;
 }
 
@@ -105,7 +103,7 @@ __global__ void OneThreadPerParticleKernel()
     // find the min among blocks, i.e. global min
     if (threadIdx.x == 0)
     {
-        fatomicMin(&d_min, b_min[0]);
+        fatomicMin(&d_min_k1, b_min[0]);
     }
 
     return;
@@ -113,14 +111,64 @@ __global__ void OneThreadPerParticleKernel()
 
 __global__ void OneThreadPerPairKernel()
 {
+    __shared__ float b_min[BLOCK_SIZE];
+
+    int k = threadIdx.x + blockDim.x * blockIdx.x;
+    // find corresponding row and column in the upper diagonal
+    /** A visual digram of 8 particles , row is i indexed while column is j indexed,
+     *      0   1   2   3   4   5   6   7
+     * 0    X   A   A   A   A   A   A   A
+     * 1        X   B   B   B   B   B   B
+     * 2            X   C   C   C   C   C
+     * 3                X   D   D   D   D
+     * 4                    X   D   D   D
+     * 5                        X   C   C
+     * 6                            X   B
+     * 7                                X
+     */
+    // row is staring row and col of each series (A, B, C, D etc.)
+    int row = k / (NMAX - 1);
+    int col = row + 1 + (k % (NMAX - 1));
+
+    int i = (col > NMAX - 1) ? NMAX - 1 - row : row;
+    int j = (col > NMAX - 1) ? NMAX - 1 - row + col % (NMAX - 1) : col;
+
+    // calculate the distance related to i and find the min of current thread
+    b_min[threadIdx.x] = sqrt(SQUARE(d_X[i] - d_X[j]) + SQUARE(d_Y[i] - d_Y[j]));
+
+    // To make sure all threads finished calc
+    __syncthreads();
+
+    // find the min within the block
+    int nTotalThreads = blockDim.x; // Total number of active threads;
+    // only the first half of the threads will be active.
+    while (nTotalThreads > 1)
+    {
+        int halfPoint = (nTotalThreads >> 1); // divide by two
+        if (threadIdx.x < halfPoint)
+        {
+            int thread2 = threadIdx.x + halfPoint;
+            b_min[threadIdx.x] = MIN(b_min[threadIdx.x], b_min[thread2]); // Pairwise summation
+        }
+        __syncthreads();
+        nTotalThreads = halfPoint; // Reducing the binary tree size by two
+    }
+
+    // find the min among blocks, i.e. global min
+    if (threadIdx.x == 0)
+    {
+        fatomicMin(&d_min_k2, b_min[0]);
+    }
+
+    return;
 }
 
 int main(int argc, char **argv)
 {
-    struct timeval tdr0, tdr1, tdr2, tdr3;
+    struct timeval tdr0, tdr1, tdr2, tdr3, tdr4, tdr5;
     double cputime, k1time, k2time;
     double min0;
-    float next_dist, min;
+    float next_dist, min_k1, min_k2;
     int error;
     // int NMAX;
     int NBLOCKS;
@@ -128,19 +176,6 @@ int main(int argc, char **argv)
     // Loop to run the timing test multiple times:
     for (int kk = 0; kk < NTESTS; kk++)
     {
-        // double NMAX every time
-        // NMAX = INIT_NMAX * (int)pow(2, kk);
-        // printf("NMAX = %d", NMAX);
-
-        // allocate CPU memory
-        // h_X = (float *)malloc(NMAX * sizeof(float));
-        // h_Y = (float *)malloc(NMAX * sizeof(float));
-
-        // allocate GPU memory
-        // cudaMalloc((void **)&d_X, NMAX * sizeof(float));
-        // cudaMalloc((void **)&d_Y, NMAX * sizeof(float));
-        // cudaMalloc((void **)&d_dist, NMAX * (NMAX - 1) * sizeof(float));
-
         // Initializing random number generator:
         srand(kk + 1);
 
@@ -199,42 +234,52 @@ int main(int argc, char **argv)
         OneThreadPerParticleKernel<<<NBLOCKS, BLOCK_SIZE>>>();
 
         gettimeofday(&tdr3, NULL);
-        // tdr = tdr0;
-        // timeval_subtract(&restime, &tdr1, &tdr);
 
         // Copying the result back to host (we time it):
-        if (error = cudaMemcpyFromSymbol(&min, d_min, sizeof(float), 0, cudaMemcpyDeviceToHost))
+        if (error = cudaMemcpyFromSymbol(&min_k1, d_min_k1, sizeof(float), 0, cudaMemcpyDeviceToHost))
         {
-            printf("Error %d\n", error);
+            printf("Error copy from min_k1 %d\n", error);
             exit(error);
         }
 
         if (error = cudaDeviceSynchronize())
         {
-            printf("Error %d\n", error);
+            printf("Error cudaDeviceSynchronize for min_k1 %d\n", error);
             exit(error);
         }
 
-        printf("Min distance between %d particle pair: GPU kerneal1(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min, min0, fabs((double)min - min0) / min0);
-        // printf("Min distance between %d particle pair: GPU kerneal1(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min, min0, fabs((double)min - min0) / min0);
+        gettimeofday(&tdr4, NULL);
+
+        // Hybrid binary/atomic reduction:
+        NBLOCKS = NMAX / BLOCK_SIZE / 2 * (NMAX - 1);
+        OneThreadPerPairKernel<<<NBLOCKS, BLOCK_SIZE>>>();
+
+        gettimeofday(&tdr5, NULL);
+
+        // Copying the result back to host (we time it):
+        if (error = cudaMemcpyFromSymbol(&min_k2, d_min_k2, sizeof(float), 0, cudaMemcpyDeviceToHost))
+        {
+            printf("Error copy from min_k2 %d\n", error);
+            exit(error);
+        }
+
+        if (error = cudaDeviceSynchronize())
+        {
+            printf("Error cudaDeviceSynchronize for min_k2 %d\n", error);
+            exit(error);
+        }
 
         timeval_subtract(&cputime, &tdr1, &tdr0);
         printf("CPU Time: %e\n", cputime);
 
+        printf("Min distance between %d particle pair: GPU k1(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min_k1, min0, fabs((double)min_k1 - min0) / min0);
         timeval_subtract(&k1time, &tdr3, &tdr2);
         printf("GPU kernel1(OneThreadPerParticle) Time: %e\n", k1time);
-        // printf("GPU kernel1(OneThreadPerParticle) Time: %e\n", k2time);
 
-        //--------------------------------------------------------------------------------
-        // free GPU memory
-        // cudaFree(d_X);
-        // cudaFree(d_Y);
-        // cudaFree(d_dist);
+        printf("Min distance between %d particle pair: GPU k2(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min_k2, min0, fabs((double)min_k2 - min0) / min0);
+        timeval_subtract(&k1time, &tdr5, &tdr4);
+        printf("GPU kernel1(OneThreadPerPair) Time: %e\n", k2time);
 
-        // free CPU memory
-        // free(h_X);
-        // free(h_Y);
-        // free(h_Y);
     } // kk loop
 
     return 0;
