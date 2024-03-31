@@ -15,7 +15,7 @@
 
 // Total number of threads (total number of elements to process in the kernel):
 // #define INIT_NMAX
-#define NMAX 1024
+#define NMAX 12392
 
 // Number of times to run the test (for scaling of dataset):
 #define NTESTS 3
@@ -131,7 +131,7 @@ __global__ void OneThreadPerPairKernel()
     int col = row + 1 + (k % (NMAX - 1));
 
     int i = (col > NMAX - 1) ? NMAX - 1 - row : row;
-    int j = (col > NMAX - 1) ? NMAX - 1 - row + col % (NMAX - 1) : col;
+    int j = (col > NMAX - 1) ? col - row : col;
 
     // calculate the distance related to i and find the min of current thread
     b_min[threadIdx.x] = sqrt(SQUARE(d_X[i] - d_X[j]) + SQUARE(d_Y[i] - d_Y[j]));
@@ -277,8 +277,8 @@ int main(int argc, char **argv)
         printf("GPU kernel1(OneThreadPerParticle) Time: %e\n", k1time);
 
         printf("Min distance between %d particle pair: GPU k2(%.7f) vs CPU(%.7f) (relative error %e)\n", NMAX, min_k2, min0, fabs((double)min_k2 - min0) / min0);
-        timeval_subtract(&k1time, &tdr5, &tdr4);
-        printf("GPU kernel1(OneThreadPerPair) Time: %e\n", k2time);
+        timeval_subtract(&k2time, &tdr5, &tdr4);
+        printf("GPU kernel2(OneThreadPerPair) Time: %e\n", k2time);
 
     } // kk loop
 
