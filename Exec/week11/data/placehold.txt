@@ -1,0 +1,1 @@
+The scraped data set we can use is available through eBooks@Adelaide, a project of the University of Adelaide Library. The aim is it is to provide the text of "classic" works of literature, history, philosophy and science through the web, as ebooks.  Currently it stores over 4000 books.
