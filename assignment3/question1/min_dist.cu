@@ -15,7 +15,7 @@
 
 // Total number of threads (total number of elements to process in the kernel):
 // #define INIT_NMAX
-#define NMAX 12392
+#define NMAX 92672
 
 // Number of times to run the test (for scaling of dataset):
 #define NTESTS 3
