@@ -65,7 +65,6 @@ Exec/week11/data/*.json
 Exec/week11/modernism_meta_text/
 Exec/week11/modernism_word_count/
 Exec/week11/modernism_word_filt/
-assignment3/question2/Amazon/*.zip
-assignment3/question2/Amazon/Amazon_Books/
-assignment3/question2/Amazon/Amazon_Digital_Music/
-assignment3/question2/Amazon/Amazon_Movies_and_TV/
+assignment3/question2/input/
+assignment3/question2/output/
+assignment3/question2/url.yaml
